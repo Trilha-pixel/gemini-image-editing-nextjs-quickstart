@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryItem } from "@/lib/types";
-import { buildComposePrompt, type PoliticalFigure, type FriendGender } from "@/lib/utils";
+import { buildComposePrompt, type PoliticalFigure, type FriendGender, SCENARIO_OPTIONS } from "@/lib/utils";
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
@@ -17,6 +17,7 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [friendGender, setFriendGender] = useState<"homem" | "mulher" | null>(null);
+  const [sceneKey, setSceneKey] = useState<string | null>(null);
 
   const handleImageSelect = (imageData: string) => {
     setImage(imageData || null);
@@ -48,7 +49,12 @@ export default function Home() {
       setError(null);
       setResultImage(null);
 
-      const prompt = buildComposePrompt(politicalFigure, friendGender as FriendGender | undefined);
+      const sceneDescription = SCENARIO_OPTIONS.find((s) => s.key === sceneKey || "")?.description;
+      const prompt = buildComposePrompt(
+        politicalFigure,
+        friendGender as FriendGender | undefined,
+        sceneDescription
+      );
       const response = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,11 +124,24 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
+              <div className="pt-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Escolha o cenário:</p>
+                <select
+                  className="w-full rounded-md border border-secondary bg-background px-3 py-2 text-sm"
+                  value={sceneKey ?? ""}
+                  onChange={(e) => setSceneKey(e.target.value || null)}
+                >
+                  <option value="">Selecione um cenário...</option>
+                  {SCENARIO_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex gap-3 pt-4">
-                <Button variant="default" disabled={!image || !friendGender} onClick={() => handleGenerateLLM('bolsonaro')}>
+                <Button variant="default" disabled={!image || !friendGender || !sceneKey} onClick={() => handleGenerateLLM('bolsonaro')}>
                   Gerar com Bolsonaro
                 </Button>
-                <Button variant="secondary" disabled={!image || !friendGender} onClick={() => handleGenerateLLM('lula')}>
+                <Button variant="secondary" disabled={!image || !friendGender || !sceneKey} onClick={() => handleGenerateLLM('lula')}>
                   Gerar com Lula
                 </Button>
               </div>
