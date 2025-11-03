@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryItem } from "@/lib/types";
-import { buildComposePrompt, type PoliticalFigure } from "@/lib/utils";
+import { buildComposePrompt, type PoliticalFigure, type FriendGender } from "@/lib/utils";
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
@@ -16,6 +16,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
+  const [friendGender, setFriendGender] = useState<"homem" | "mulher" | null>(null);
 
   const handleImageSelect = (imageData: string) => {
     setImage(imageData || null);
@@ -47,7 +48,7 @@ export default function Home() {
       setError(null);
       setResultImage(null);
 
-      const prompt = buildComposePrompt(politicalFigure);
+      const prompt = buildComposePrompt(politicalFigure, friendGender as FriendGender | undefined);
       const response = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,11 +99,30 @@ export default function Home() {
                 onImageSelect={handleImageSelect}
                 currentImage={currentImage}
               />
+              <div className="pt-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Seu amigo é um:</p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={friendGender === "homem" ? "default" : "outline"}
+                    onClick={() => setFriendGender("homem")}
+                  >
+                    Homem
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={friendGender === "mulher" ? "default" : "outline"}
+                    onClick={() => setFriendGender("mulher")}
+                  >
+                    Mulher
+                  </Button>
+                </div>
+              </div>
               <div className="flex gap-3 pt-4">
-                <Button variant="default" disabled={!image} onClick={() => handleGenerateLLM('bolsonaro')}>
+                <Button variant="default" disabled={!image || !friendGender} onClick={() => handleGenerateLLM('bolsonaro')}>
                   Gerar com Bolsonaro
                 </Button>
-                <Button variant="secondary" disabled={!image} onClick={() => handleGenerateLLM('lula')}>
+                <Button variant="secondary" disabled={!image || !friendGender} onClick={() => handleGenerateLLM('lula')}>
                   Gerar com Lula
                 </Button>
               </div>

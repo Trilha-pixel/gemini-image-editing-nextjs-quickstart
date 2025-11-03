@@ -100,7 +100,10 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
                 1. Envie a foto do seu Amigo
               </p>
               <p className="text-xs text-muted-foreground">
-                Maximum file size: 10MB
+                Recomendações: rosto nítido, bem iluminado, de frente ou 3/4; uma pessoa só; sem óculos escuros; fundo simples.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Tamanho máximo do arquivo: 10MB
               </p>
             </div>
           </div>
