@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { ImageUpload } from "@/components/ImageUpload";
-import { ImagePromptInput } from "@/components/ImagePromptInput";
 import { ImageResultDisplay } from "@/components/ImageResultDisplay";
+import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryItem } from "@/lib/types";
@@ -11,95 +11,46 @@ export default function Home() {
   const [image, setImage] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [resultImage, setResultImage] = useState<string | null>(null);
 
   const handleImageSelect = (imageData: string) => {
     setImage(imageData || null);
   };
 
-  const handlePromptSubmit = async (prompt: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // If we have a generated image, use that for editing, otherwise use the uploaded image
-      const imageToEdit = generatedImage || image;
-
-      // Prepare the request data as JSON
-      const requestData = {
-        prompt,
-        image: imageToEdit,
-        history: history.length > 0 ? history : undefined,
-      };
-
-      const response = await fetch("/api/image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate image");
-      }
-
-      const data = await response.json();
-
-      if (data.image) {
-        // Update the generated image and description
-        setGeneratedImage(data.image);
-        setDescription(data.description || null);
-
-        // Update history locally - add user message
-        const userMessage: HistoryItem = {
-          role: "user",
-          parts: [
-            { text: prompt },
-            ...(imageToEdit ? [{ image: imageToEdit }] : []),
-          ],
-        };
-
-        // Add AI response
-        const aiResponse: HistoryItem = {
-          role: "model",
-          parts: [
-            ...(data.description ? [{ text: data.description }] : []),
-            ...(data.image ? [{ image: data.image }] : []),
-          ],
-        };
-
-        // Update history with both messages
-        setHistory((prevHistory) => [...prevHistory, userMessage, aiResponse]);
-      } else {
-        setError("No image returned from API");
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-      console.error("Error processing request:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  
 
   const handleReset = () => {
     setImage(null);
     setGeneratedImage(null);
     setDescription(null);
-    setLoading(false);
+    setIsLoading(false);
     setError(null);
     setHistory([]);
+    setResultImage(null);
   };
 
   // If we have a generated image, we want to edit it next time
   const currentImage = generatedImage || image;
-  const isEditing = !!currentImage;
+  
 
-  // Get the latest image to display (always the generated image)
-  const displayImage = generatedImage;
+// Get the latest image to display (prefer mocked result image, then generated)
+  const displayImage = resultImage || generatedImage;
+
+  const handleGenerateMock = (politicalFigure: 'bolsonaro' | 'lula') => {
+    setIsLoading(true);
+    setResultImage(null);
+
+    setTimeout(() => {
+      setIsLoading(false);
+      const mockPath = politicalFigure === 'bolsonaro'
+        ? '/mocks/bolsonaro_result_mock.jpg'
+        : '/mocks/bolsonaro_result_mock.jpg';
+      setResultImage(mockPath);
+    }, 2000);
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-background p-8">
@@ -120,26 +71,29 @@ export default function Home() {
             </div>
           )}
 
-          {!displayImage && !loading ? (
+          {!displayImage && !isLoading ? (
             <>
               <ImageUpload
                 onImageSelect={handleImageSelect}
                 currentImage={currentImage}
               />
-              <ImagePromptInput
-                onSubmit={handlePromptSubmit}
-                isEditing={isEditing}
-                isLoading={loading}
-              />
+              <div className="flex gap-3 pt-4">
+                <Button variant="default" disabled={!image} onClick={() => handleGenerateMock('bolsonaro')}>
+                  Gerar com Bolsonaro
+                </Button>
+                <Button variant="secondary" disabled={!image} onClick={() => handleGenerateMock('lula')}>
+                  Gerar com Lula
+                </Button>
+              </div>
             </>
-          ) : loading ? (
+          ) : isLoading ? (
             <div
               role="status"
               className="flex items-center mx-auto justify-center h-56 max-w-sm bg-gray-300 rounded-lg animate-pulse dark:bg-secondary"
             >
               <ImageIcon className="w-10 h-10 text-gray-200 dark:text-muted-foreground" />
               <span className="pl-4 font-mono font-xs text-muted-foreground">
-                Processing...
+                Criando sua obra-prima...
               </span>
             </div>
           ) : (
@@ -150,11 +104,13 @@ export default function Home() {
                 onReset={handleReset}
                 conversationHistory={history}
               />
-              <ImagePromptInput
-                onSubmit={handlePromptSubmit}
-                isEditing={true}
-                isLoading={loading}
-              />
+              {resultImage && (
+                <div className="pt-4">
+                  <a href={resultImage} download="meme-gerado.jpg">
+                    <Button variant="default">Baixar Imagem</Button>
+                  </a>
+                </div>
+              )}
             </>
           )}
         </CardContent>

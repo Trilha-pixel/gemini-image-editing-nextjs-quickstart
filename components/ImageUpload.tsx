@@ -97,7 +97,7 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
             <UploadIcon className="w-8 h-8 text-primary mr-3 flex-shrink-0" aria-hidden="true" />
             <div className="">
               <p className="text-sm font-medium text-foreground">
-                Drop your image here or click to browse
+                1. Envie a foto do seu Amigo
               </p>
               <p className="text-xs text-muted-foreground">
                 Maximum file size: 10MB
