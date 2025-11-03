@@ -117,20 +117,20 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-8">
+    <main className="min-h-screen flex items-center justify-center bg-background p-4 sm:p-6 md:p-8">
       <Card className="w-full max-w-4xl border-0 bg-card shadow-none">
-        <CardHeader className="flex flex-col items-center justify-center space-y-2">
-          <CardTitle className="flex items-center gap-2 text-foreground font-bold text-4xl">
-            <Wand2 className="w-8 h-8 text-primary" />
+        <CardHeader className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-foreground font-bold text-2xl sm:text-3xl md:text-4xl text-center">
+            <Wand2 className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-primary" />
             Gabinete da Zoeira
           </CardTitle>
-          <span className="text-lg text-muted-foreground">
+          <span className="text-sm sm:text-base md:text-lg text-muted-foreground text-center px-2">
             Crie a foto que seu amigo não quer que ninguém veja.
           </span>
         </CardHeader>
-        <CardContent className="space-y-6 pt-6 w-full">
+        <CardContent className="space-y-4 sm:space-y-6 pt-4 sm:pt-6 w-full px-4 sm:px-6">
           {error && (
-            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
+            <div className="p-3 sm:p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
               {error}
             </div>
           )}
@@ -141,13 +141,14 @@ export default function Home() {
                 onImageSelect={handleImageSelect}
                 currentImage={currentImage}
               />
-              <div className="pt-4 space-y-2">
-                <p className="text-sm text-muted-foreground">Seu amigo é um:</p>
-                <div className="flex gap-2">
+              <div className="pt-3 sm:pt-4 space-y-2">
+                <p className="text-sm sm:text-base font-medium text-foreground">Seu amigo é um:</p>
+                <div className="flex gap-2 sm:gap-3">
                   <Button
                     type="button"
                     variant={friendGender === "homem" ? "default" : "outline"}
                     onClick={() => setFriendGender("homem")}
+                    className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
                   >
                     Homem
                   </Button>
@@ -155,15 +156,16 @@ export default function Home() {
                     type="button"
                     variant={friendGender === "mulher" ? "default" : "outline"}
                     onClick={() => setFriendGender("mulher")}
+                    className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
                   >
                     Mulher
                   </Button>
                 </div>
               </div>
-              <div className="pt-4 space-y-2">
-                <p className="text-sm text-muted-foreground">Escolha o cenário:</p>
+              <div className="pt-3 sm:pt-4 space-y-2">
+                <p className="text-sm sm:text-base font-medium text-foreground">Escolha o cenário:</p>
                 <select
-                  className="w-full rounded-md border border-secondary bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  className="w-full rounded-md border border-secondary bg-background px-4 py-3 sm:px-3 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 min-h-[44px] sm:min-h-0"
                   value={sceneKey ?? ""}
                   onChange={(e) => setSceneKey(e.target.value || null)}
                 >
@@ -173,12 +175,12 @@ export default function Home() {
                   ))}
                 </select>
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-3 sm:pt-4">
                 <Button 
                   variant="default" 
                   disabled={!image || !friendGender || !sceneKey} 
                   onClick={() => handleGenerateLLM('bolsonaro')}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 sm:py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
                 >
                   Gerar com Bolsonaro
                 </Button>
@@ -186,7 +188,7 @@ export default function Home() {
                   variant="secondary" 
                   disabled={!image || !friendGender || !sceneKey} 
                   onClick={() => handleGenerateLLM('lula')}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg"
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 sm:py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
                 >
                   Gerar com Lula
                 </Button>
@@ -195,10 +197,13 @@ export default function Home() {
           ) : isLoading ? (
             <div
               role="status"
-              className="flex flex-col items-center mx-auto justify-center h-56 max-w-sm bg-gray-300 rounded-lg animate-pulse dark:bg-secondary"
+              className="flex flex-col items-center justify-center mx-auto min-h-[300px] sm:min-h-[400px] max-w-sm bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg animate-pulse p-8"
             >
-              <ImageIcon className="w-10 h-10 text-gray-200 dark:text-muted-foreground" />
-              <p className="mt-2 text-lg font-medium text-foreground">
+              <div className="relative">
+                <ImageIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 animate-bounce" />
+                <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+              </div>
+              <p className="mt-4 sm:mt-6 text-base sm:text-lg font-medium text-foreground text-center px-4">
                 {loadingText}
               </p>
             </div>
@@ -211,17 +216,17 @@ export default function Home() {
                 conversationHistory={history}
               />
               {resultImage && (
-                <div className="pt-4 flex gap-3">
+                <div className="pt-4 flex flex-col sm:flex-row gap-3">
                   <Button 
                     onClick={handleShare}
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg"
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0 flex-1 sm:flex-initial"
                   >
                     Compartilhar no WhatsApp
                   </Button>
-                  <a href={resultImage} download="meme-gerado.jpg">
+                  <a href={resultImage} download="meme-gerado.jpg" className="flex-1 sm:flex-initial">
                     <Button 
                       variant="outline"
-                      className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+                      className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 sm:py-2 rounded-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
                     >
                       Baixar Imagem
                     </Button>

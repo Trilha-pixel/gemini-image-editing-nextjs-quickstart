@@ -36,38 +36,40 @@ export function ImageResultDisplay({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Generated Image</h2>
-        <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={handleDownload}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-2">
+        <h2 className="text-lg sm:text-xl font-semibold">Imagem Gerada</h2>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={handleDownload} className="text-xs sm:text-sm min-h-[36px]">
             <Download className="w-4 h-4 mr-2" />
             Download
           </Button>
           {conversationHistory.length > 0 && (
-            <Button variant="outline" size="sm" onClick={toggleHistory}>
+            <Button variant="outline" size="sm" onClick={toggleHistory} className="text-xs sm:text-sm min-h-[36px]">
               <MessageCircle className="w-4 h-4 mr-2" />
-              {showHistory ? "Hide History" : "Show History"}
+              <span className="hidden sm:inline">{showHistory ? "Ocultar" : "Histórico"}</span>
+              <span className="sm:hidden">{showHistory ? "Ocultar" : "Ver"}</span>
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={onReset}>
+          <Button variant="outline" size="sm" onClick={onReset} className="text-xs sm:text-sm min-h-[36px]">
             <RotateCcw className="w-4 h-4 mr-2" />
-            Create New Image
+            <span className="hidden sm:inline">Nova Imagem</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
 
-      <div className="rounded-lg overflow-hidden bg-muted p-2">
+      <div className="rounded-lg overflow-hidden bg-muted p-2 sm:p-3">
         <img
           src={imageUrl}
           alt={description || "Generated image"}
-          className="max-w-[640px] h-auto mx-auto"
+          className="w-full max-w-full sm:max-w-[640px] h-auto mx-auto rounded-lg"
         />
       </div>
 
       {description && (
-        <div className="p-4 rounded-lg bg-muted">
-          <h3 className="text-sm font-medium mb-2">Description</h3>
-          <p className="text-sm text-muted-foreground">{description}</p>
+        <div className="p-3 sm:p-4 rounded-lg bg-muted">
+          <h3 className="text-sm font-medium mb-2">Descrição</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
         </div>
       )}
 

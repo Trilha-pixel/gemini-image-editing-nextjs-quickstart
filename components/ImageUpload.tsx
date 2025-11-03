@@ -84,36 +84,34 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
       {!currentImage ? (
         <div
           {...getRootProps()}
-          className={`min-h-[150px] p-4 rounded-lg
-          ${isDragActive ? "bg-secondary/50" : "bg-secondary"}
+          className={`min-h-[180px] sm:min-h-[150px] p-6 sm:p-4 rounded-xl sm:rounded-lg
+          ${isDragActive ? "bg-green-50 border-green-400" : "bg-secondary"}
           ${isLoading ? "opacity-50 cursor-wait" : ""}
-          transition-colors duration-200 ease-in-out hover:bg-secondary/50
+          transition-all duration-200 ease-in-out hover:bg-secondary/50 active:scale-[0.98]
           border-2 border-dashed border-secondary
-          cursor-pointer flex items-center justify-center gap-4
+          cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4
         `}
         >
           <input {...getInputProps()} />
-          <div className="flex flex-row items-center" role="presentation">
-            <UploadIcon className="w-8 h-8 text-primary mr-3 flex-shrink-0" aria-hidden="true" />
-            <div className="">
-              <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                <span>1. Envie a foto do seu Amigo</span>
-                <HelpCircle
-                  className="w-4 h-4 text-muted-foreground"
-                  aria-label="Ajuda"
-                  title="Recomendações: rosto nítido, bem iluminado, de frente ou 3/4; uma pessoa só; sem óculos escuros; fundo simples."
-                />
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Tamanho máximo do arquivo: 10MB
-              </p>
-            </div>
+          <UploadIcon className="w-10 h-10 sm:w-8 sm:h-8 text-primary flex-shrink-0" aria-hidden="true" />
+          <div className="text-center sm:text-left">
+            <p className="text-sm sm:text-sm font-medium text-foreground flex items-center justify-center sm:justify-start gap-2">
+              <span>1. Envie a foto do seu Amigo</span>
+              <HelpCircle
+                className="w-4 h-4 text-muted-foreground cursor-help"
+                aria-label="Ajuda"
+                title="Recomendações: rosto nítido, bem iluminado, de frente ou 3/4; uma pessoa só; sem óculos escuros; fundo simples."
+              />
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tamanho máximo: 10MB
+            </p>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center p-4 rounded-lg bg-secondary">
+        <div className="flex flex-col items-center p-4 sm:p-4 rounded-xl sm:rounded-lg bg-secondary border border-secondary">
           <div className="flex w-full items-center mb-4">
-            <ImageIcon className="w-8 h-8 text-primary mr-3 flex-shrink-0" aria-hidden="true" />
+            <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary mr-2 sm:mr-3 flex-shrink-0" aria-hidden="true" />
             <div className="flex-grow min-w-0">
               <p className="text-sm font-medium truncate text-foreground">
                 {selectedFile?.name || "Current Image"}
@@ -128,17 +126,17 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
               variant="ghost"
               size="icon"
               onClick={handleRemove}
-              className="flex-shrink-0 ml-2"
+              className="flex-shrink-0 ml-2 min-h-[44px] min-w-[44px]"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
               <span className="sr-only">Remove image</span>
             </Button>
           </div>
-          <div className="w-full overflow-hidden rounded-md">
+          <div className="w-full overflow-hidden rounded-lg">
             <img
               src={currentImage}
               alt="Selected"
-              className="w-full h-auto object-contain"
+              className="w-full h-auto object-contain max-h-[400px] sm:max-h-none"
             />
           </div>
         </div>
