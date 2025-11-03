@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryItem } from "@/lib/types";
+import { buildComposePrompt, type PoliticalFigure } from "@/lib/utils";
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
@@ -36,20 +37,40 @@ export default function Home() {
   const currentImage = generatedImage || image;
   
 
-// Get the latest image to display (prefer mocked result image, then generated)
+// Get the latest image to display (prefer mocked/API result image, then generated)
   const displayImage = resultImage || generatedImage;
 
-  const handleGenerateMock = (politicalFigure: 'bolsonaro' | 'lula') => {
-    setIsLoading(true);
-    setResultImage(null);
+  const handleGenerateLLM = async (politicalFigure: PoliticalFigure) => {
+    if (!image) return;
+    try {
+      setIsLoading(true);
+      setError(null);
+      setResultImage(null);
 
-    setTimeout(() => {
+      const prompt = buildComposePrompt(politicalFigure);
+      const response = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, image })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Falha ao gerar imagem");
+      }
+
+      const data = await response.json();
+      if (data?.image) {
+        setResultImage(data.image);
+        setDescription(data.description || null);
+      } else {
+        throw new Error("Resposta sem imagem");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
       setIsLoading(false);
-      const mockPath = politicalFigure === 'bolsonaro'
-        ? '/mocks/bolsonaro_result_mock.jpg'
-        : '/mocks/bolsonaro_result_mock.jpg';
-      setResultImage(mockPath);
-    }, 2000);
+    }
   };
 
   return (
@@ -78,10 +99,10 @@ export default function Home() {
                 currentImage={currentImage}
               />
               <div className="flex gap-3 pt-4">
-                <Button variant="default" disabled={!image} onClick={() => handleGenerateMock('bolsonaro')}>
+                <Button variant="default" disabled={!image} onClick={() => handleGenerateLLM('bolsonaro')}>
                   Gerar com Bolsonaro
                 </Button>
-                <Button variant="secondary" disabled={!image} onClick={() => handleGenerateMock('lula')}>
+                <Button variant="secondary" disabled={!image} onClick={() => handleGenerateLLM('lula')}>
                   Gerar com Lula
                 </Button>
               </div>
