@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "./ui/button";
-import { Upload as UploadIcon, Image as ImageIcon, X } from "lucide-react";
+import { Upload as UploadIcon, Image as ImageIcon, X, HelpCircle } from "lucide-react";
 
 interface ImageUploadProps {
   onImageSelect: (imageData: string) => void;
@@ -96,11 +96,13 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
           <div className="flex flex-row items-center" role="presentation">
             <UploadIcon className="w-8 h-8 text-primary mr-3 flex-shrink-0" aria-hidden="true" />
             <div className="">
-              <p className="text-sm font-medium text-foreground">
-                1. Envie a foto do seu Amigo
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Recomendações: rosto nítido, bem iluminado, de frente ou 3/4; uma pessoa só; sem óculos escuros; fundo simples.
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                <span>1. Envie a foto do seu Amigo</span>
+                <HelpCircle
+                  className="w-4 h-4 text-muted-foreground"
+                  aria-label="Ajuda"
+                  title="Recomendações: rosto nítido, bem iluminado, de frente ou 3/4; uma pessoa só; sem óculos escuros; fundo simples."
+                />
               </p>
               <p className="text-xs text-muted-foreground">
                 Tamanho máximo do arquivo: 10MB
