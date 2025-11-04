@@ -172,54 +172,113 @@ export async function POST(request: Request) {
       console.log('✅ Token obtido com sucesso');
 
       // Endpoint da API REST do Vertex AI Imagen
-      // NOTA: O modelo imagegeneration@006 é a versão mais recente do Imagen 3
-      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`;
-      
-      console.log(`📡 Chamando Vertex AI Imagen: ${endpoint}`);
+      // Tentar múltiplas versões do modelo em ordem de preferência
+      const modelVersions = [
+        'imagegeneration@006', // Imagen 3 mais recente
+        'imagegeneration@005', // Imagen 3 anterior
+        'imagegeneration@004', // Imagen 3 anterior
+        'imagegeneration@003', // Imagen 3 anterior
+      ];
 
-      // Criar prompt de inpainting que preserva a identidade
-      const inpaintingPrompt = `${finalInpaintingPrompt}. A pessoa deve aparecer EXATAMENTE como na imagem de referência, mantendo todas as características faciais idênticas.`;
+      let imagenError: Error | null = null;
+      let imagenData: any = null;
 
-      const requestBody = {
-        instances: [
-          {
-            prompt: inpaintingPrompt,
-            image: {
-              bytesBase64Encoded: baseImageBase64.data,
-            },
-            mask: {
+      // Tentar cada versão do modelo
+      for (const modelVersion of modelVersions) {
+        const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:predict`;
+        
+        console.log(`📡 Tentando modelo: ${modelVersion}`);
+        console.log(`🔗 Endpoint: ${endpoint}`);
+
+        // Criar prompt de inpainting que preserva a identidade
+        const inpaintingPrompt = `${finalInpaintingPrompt}. A pessoa deve aparecer EXATAMENTE como na imagem de referência, mantendo todas as características faciais idênticas.`;
+
+        const requestBody = {
+          instances: [
+            {
+              prompt: inpaintingPrompt,
               image: {
-                bytesBase64Encoded: maskImageBase64.data,
+                bytesBase64Encoded: baseImageBase64.data,
+              },
+              mask: {
+                image: {
+                  bytesBase64Encoded: maskImageBase64.data,
+                },
+              },
+              referenceImage: {
+                bytesBase64Encoded: friendImageBase64.data,
               },
             },
-            referenceImage: {
-              bytesBase64Encoded: friendImageBase64.data,
-            },
+          ],
+          parameters: {
+            sampleCount: 1,
+            guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
+            aspectRatio: '1:1', // Manter proporção
           },
-        ],
-        parameters: {
-          sampleCount: 1,
-          guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
-          aspectRatio: '1:1', // Manter proporção
-        },
-      };
+        };
 
-      const imagenResponse = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+        try {
+          const imagenResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
 
-      if (!imagenResponse.ok) {
-        const errorText = await imagenResponse.text();
-        console.error('❌ Erro na API do Vertex AI Imagen:', errorText);
-        throw new Error(`Vertex AI Imagen retornou erro ${imagenResponse.status}: ${errorText}`);
+          if (!imagenResponse.ok) {
+            const errorText = await imagenResponse.text();
+            console.error(`❌ Modelo ${modelVersion} falhou (${imagenResponse.status}):`, errorText);
+            
+            // Se for 403 ou 404, tentar próxima versão
+            if (imagenResponse.status === 403 || imagenResponse.status === 404) {
+              imagenError = new Error(`Modelo ${modelVersion}: ${errorText}`);
+              continue; // Tentar próxima versão
+            }
+            
+            // Outros erros, parar
+            throw new Error(`Vertex AI Imagen retornou erro ${imagenResponse.status}: ${errorText}`);
+          }
+
+          imagenData = await imagenResponse.json();
+          console.log(`✅ Modelo ${modelVersion} funcionou!`);
+          break; // Sucesso, sair do loop
+          
+        } catch (error) {
+          // Se for erro de rede ou outro, tentar próxima versão
+          if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
+            imagenError = error;
+            continue;
+          }
+          // Outros erros, propagar
+          throw error;
+        }
       }
 
-      const imagenData = await imagenResponse.json();
+      // Se nenhum modelo funcionou
+      if (!imagenData) {
+        console.error('❌ Todos os modelos do Imagen falharam');
+        const errorMsg = imagenError?.message || 'Desconhecido';
+        
+        // Mensagem mais detalhada se for erro de permissão
+        if (errorMsg.includes('403') || errorMsg.includes('PERMISSION_DENIED')) {
+          throw new Error(`Erro de permissão: A Service Account não tem acesso ao Vertex AI Imagen. 
+          
+Solução:
+1. Acesse: https://console.cloud.google.com/iam-admin/iam?project=${projectId}
+2. Encontre sua Service Account e adicione estas roles:
+   - Vertex AI User (roles/aiplatform.user)
+   - Service Account User (roles/iam.serviceAccountUser)
+3. Aguarde 2-3 minutos e tente novamente.
+
+Também verifique se a Vertex AI API está habilitada:
+https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=${projectId}`);
+        }
+        
+        throw new Error(`Nenhum modelo do Vertex AI Imagen está disponível. Último erro: ${errorMsg}. Verifique se a API Vertex AI está habilitada e se a Service Account tem permissões.`);
+      }
+
       console.log('📦 Resposta recebida do Vertex AI Imagen');
       
       // Extrair a imagem gerada
