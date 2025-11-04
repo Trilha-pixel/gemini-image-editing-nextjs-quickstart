@@ -1,33 +1,15 @@
 import { NextResponse } from 'next/server';
-import { VertexAI } from '@google-cloud/vertexai'; // SDK da Vertex AI (para Inpainting/Imagen)
 import {
-  GoogleGenerativeAI, // SDK do Gemini (para Análise de Visão)
+  GoogleGenerativeAI, // SDK do Gemini (para Análise de Visão e Geração de Imagem)
   Part,
 } from '@google/generative-ai';
 
 // --- Configuração dos Clientes de IA ---
 // NOTA: Isso requer variáveis de ambiente em .env.local:
-// GOOGLE_CLOUD_PROJECT = "seu-projeto-gcloud"
-// GOOGLE_CLOUD_LOCATION = "us-central1"
 // GEMINI_API_KEY = "sua-chave-api-gemini-aqui"
 // ----------------------------------------------------
 
-// 1. Cliente Vertex AI (para Inpainting/Imagen)
-// Inicialização apenas se as variáveis estiverem configuradas
-let imagenModel: ReturnType<VertexAI['preview']['getGenerativeModel']> | null = null;
-
-if (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_LOCATION) {
-  const vertexAI = new VertexAI({
-    project: process.env.GOOGLE_CLOUD_PROJECT,
-    location: process.env.GOOGLE_CLOUD_LOCATION,
-  });
-
-  imagenModel = vertexAI.preview.getGenerativeModel({
-    model: 'imagegeneration@0.0.6', // Modelo de edição/geração de imagem (Imagen)
-  });
-}
-
-// 2. Cliente Gemini (para Análise de Visão)
+// Cliente Gemini (para Análise de Visão e Geração de Imagem)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // --- Helper para converter Arquivo (File) para a API do Google ---
@@ -112,48 +94,65 @@ export async function POST(request: Request) {
     console.log('Etapa 1 Concluída. Prompt Gerado:', finalInpaintingPrompt);
 
 
-    // --- ETAPA DE IA 2: Inpainting (Vertex AI / Imagen) ---
-    // (Usar a descrição gerada para preencher a máscara)
+    // --- ETAPA DE IA 2: Geração de Imagem (Gemini 2.0 Flash) ---
+    // (Usar a descrição gerada para criar a imagem final)
+    // NOTA: Usando Gemini 2.0 Flash em vez de Vertex AI/Imagen para simplificar
 
-    // Verificar se VertexAI está configurado
-    if (!imagenModel) {
-      return NextResponse.json(
-        { error: 'Vertex AI não está configurado. Configure GOOGLE_CLOUD_PROJECT e GOOGLE_CLOUD_LOCATION nas variáveis de ambiente.' },
-        { status: 500 },
-      );
-    }
-
-    console.log('Iniciando Etapa 2: Inpainting (Vertex AI)');
-    const baseImagePart = await fileToGenerativePart(baseImageFile);
-    const maskImagePart = await fileToGenerativePart(maskImageFile);
-
-    const inpaintingRequest = {
-      prompt: finalInpaintingPrompt,
-      image: baseImagePart, // Imagem base (político)
-      mask: { image: maskImagePart }, // Máscara (buraco)
-      generationConfig: {
-        count: 1,
-        guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
-      },
-    };
-
-    // @ts-expect-error - O SDK do @google-cloud/vertexai pode ter tipos complexos
-    const inpaintingResponse = await imagenModel.editImage(inpaintingRequest);
-
-    // Acessar a resposta de forma segura
-    let imageBase64: string | undefined;
-    const response = inpaintingResponse as unknown;
-    if (Array.isArray(response) && response.length > 0) {
-      const firstItem = response[0] as Record<string, unknown>;
-      imageBase64 = (firstItem?.imageBytes as string) || (firstItem?.bytes as string) || (firstItem?.data as string);
-    } else if (response && typeof response === 'object') {
-      const responseObj = response as Record<string, unknown>;
-      imageBase64 = (responseObj.imageBytes as string) || (responseObj.bytes as string) || (responseObj.data as string);
-    }
+    console.log('Iniciando Etapa 2: Geração de Imagem (Gemini 2.0 Flash)');
     
-    if (!imageBase64) {
+    // Preparar a imagem base para usar como referência
+    const baseImagePart = await fileToGenerativePart(baseImageFile);
+    
+    // Criar prompt completo para o Gemini 2.0 Flash gerar a imagem
+    const imageGenerationPrompt = `${finalInpaintingPrompt}. A imagem deve mostrar a pessoa descrita acima ao lado de um político em um cenário realista e profissional.`;
+
+    // Tentar usar Gemini 2.0 Flash para gerar a imagem diretamente
+    const imageModelsToTry = [
+      'gemini-2.0-flash-exp',
+      'gemini-2.0-flash-exp-image-generation',
+    ];
+
+    let generatedImage: string | null = null;
+    let imageError: Error | null = null;
+
+    for (const modelName of imageModelsToTry) {
+      try {
+        console.log(`🔄 Tentando gerar imagem com modelo: ${modelName}`);
+        const imageModel = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseModalities: ['Text', 'Image'],
+          },
+        });
+
+        const imageResponse = await imageModel.generateContent([
+          imageGenerationPrompt,
+          baseImagePart, // Incluir a imagem base como referência
+        ]);
+
+        // Extrair a imagem da resposta
+        const parts = imageResponse.response.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if ('inlineData' in part && part.inlineData) {
+            generatedImage = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+            break;
+          }
+        }
+
+        if (generatedImage) {
+          console.log(`✅ Imagem gerada com sucesso usando ${modelName}`);
+          break;
+        }
+      } catch (error) {
+        imageError = error instanceof Error ? error : new Error(String(error));
+        console.log(`❌ Modelo ${modelName} falhou: ${imageError.message}`);
+        continue;
+      }
+    }
+
+    if (!generatedImage) {
       return NextResponse.json(
-        { error: 'A IA de edição não retornou uma imagem.' },
+        { error: `Não foi possível gerar a imagem. Erro: ${imageError?.message || 'Nenhum modelo de imagem disponível'}` },
         { status: 500 },
       );
     }
@@ -161,8 +160,9 @@ export async function POST(request: Request) {
     // --- Resposta (Sucesso - Contrato 6.2) ---
     console.log('Etapa 2 Concluída. Enviando imagem gerada.');
 
-    // Decodifica o base64 e retorna os bytes puros da imagem
-    const imageBytes = Buffer.from(imageBase64, 'base64');
+    // Converter data URL para buffer
+    const base64Data = generatedImage.split(',')[1];
+    const imageBytes = Buffer.from(base64Data, 'base64');
     
     // Retorna a imagem PNG pura, conforme Seção 6.2 do PRD
     return new NextResponse(imageBytes, {
