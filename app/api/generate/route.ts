@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { VertexAI } from '@google-cloud/aiplatform'; // SDK da Vertex AI (para Inpainting/Imagen)
+import { VertexAI } from '@google-cloud/vertexai'; // SDK da Vertex AI (para Inpainting/Imagen)
 import {
   GoogleGenerativeAI, // SDK do Gemini (para Análise de Visão)
   Part,
