@@ -29,9 +29,6 @@ if (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_LOCATION) {
 
 // 2. Cliente Gemini (para Análise de Visão)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const visionModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash', // Modelo com suporte a visão
-});
 
 // --- Helper para converter Arquivo (File) para a API do Google ---
 async function fileToGenerativePart(file: File): Promise<Part> {
@@ -67,15 +64,34 @@ export async function POST(request: Request) {
     const visionPrompt =
       'Descreva esta pessoa em detalhes objetivos para uma IA de geração de imagem. Foque em: sexo, idade aproximada, etnia, cor e estilo do cabelo, pelos faciais (barba/bigode), óculos e quaisquer características marcantes. Seja conciso e direto. Responda apenas com a descrição.';
 
-    const visionResult = await visionModel.generateContent([
-      visionPrompt,
-      friendImagePart,
-    ]);
-    const textPrompt = visionResult.response.text();
+    // Tentar diferentes modelos em ordem de preferência
+    const modelsToTry = ['gemini-pro-vision', 'gemini-1.5-pro', 'gemini-pro'];
+    let visionResult;
+    let textPrompt = '';
+    let lastError: Error | null = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        visionResult = await model.generateContent([
+          visionPrompt,
+          friendImagePart,
+        ]);
+        textPrompt = visionResult.response.text();
+        if (textPrompt && textPrompt.trim() !== '') {
+          console.log(`Modelo ${modelName} funcionou com sucesso`);
+          break;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.log(`Modelo ${modelName} falhou, tentando próximo...`);
+        continue;
+      }
+    }
 
     if (!textPrompt || textPrompt.trim() === '') {
       return NextResponse.json(
-        { error: 'Não foi possível analisar a imagem do amigo.' },
+        { error: `Não foi possível analisar a imagem do amigo. Último erro: ${lastError?.message || 'Nenhum modelo disponível'}` },
         { status: 500 },
       );
     }
