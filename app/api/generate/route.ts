@@ -65,13 +65,24 @@ export async function POST(request: Request) {
       'Descreva esta pessoa em detalhes objetivos para uma IA de geração de imagem. Foque em: sexo, idade aproximada, etnia, cor e estilo do cabelo, pelos faciais (barba/bigode), óculos e quaisquer características marcantes. Seja conciso e direto. Responda apenas com a descrição.';
 
     // Tentar diferentes modelos em ordem de preferência
-    const modelsToTry = ['gemini-pro-vision', 'gemini-1.5-pro', 'gemini-pro'];
+    // PRIORIDADE: gemini-pro-vision (modelo especializado em visão)
+    const modelsToTry = [
+      'gemini-pro-vision',     // Modelo especializado em visão (recomendado)
+      'gemini-2.0-flash-exp',  // Modelo experimental mais recente
+      'gemini-1.5-flash-002',  // Versão específica do Flash
+      'gemini-1.5-pro-002',    // Versão específica do Pro
+      'gemini-1.5-flash',      // Flash sem versão
+      'gemini-1.5-pro',        // Pro sem versão
+    ];
+    
     let visionResult;
     let textPrompt = '';
     let lastError: Error | null = null;
 
+    console.log('🔍 Iniciando tentativas com modelos Gemini...');
     for (const modelName of modelsToTry) {
       try {
+        console.log(`🔄 Tentando modelo: ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName });
         visionResult = await model.generateContent([
           visionPrompt,
@@ -79,12 +90,12 @@ export async function POST(request: Request) {
         ]);
         textPrompt = visionResult.response.text();
         if (textPrompt && textPrompt.trim() !== '') {
-          console.log(`Modelo ${modelName} funcionou com sucesso`);
+          console.log(`✅ Modelo ${modelName} funcionou com sucesso!`);
           break;
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.log(`Modelo ${modelName} falhou, tentando próximo...`);
+        console.log(`❌ Modelo ${modelName} falhou: ${lastError.message}`);
         continue;
       }
     }
