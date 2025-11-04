@@ -5,7 +5,7 @@ import { ImageResultDisplay } from "@/components/ImageResultDisplay";
 import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { HistoryItem } from "@/lib/types";
-import { type PoliticalFigure, SCENARIO_OPTIONS } from "@/lib/utils";
+import { type PoliticalFigure } from "@/lib/utils";
 
 const loadingTexts = [
   "Imprimindo a faixa presidencial...",
@@ -23,8 +23,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
-  const [friendGender, setFriendGender] = useState<"homem" | "mulher" | null>(null);
-  const [sceneKey, setSceneKey] = useState<string | null>(null);
   const [loadingText, setLoadingText] = useState("");
 
   const handleImageSelect = (imageData: string) => {
@@ -51,21 +49,18 @@ export default function Home() {
   const displayImage = resultImage || generatedImage;
 
   const handleGenerateLLM = async (politicalFigure: PoliticalFigure) => {
-    if (!image || !friendGender || !sceneKey) return;
+    if (!image) return;
     try {
       setLoadingText(loadingTexts[Math.floor(Math.random() * loadingTexts.length)]);
       setIsLoading(true);
       setError(null);
       setResultImage(null);
 
-      const sceneDescription = SCENARIO_OPTIONS.find((s) => s.key === sceneKey)?.description || "";
       const response = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           politicalFigure,
-          genero: friendGender,
-          cenario: sceneDescription,
           image
         })
       });
@@ -158,47 +153,11 @@ export default function Home() {
                   onImageSelect={handleImageSelect}
                   currentImage={currentImage}
                 />
-                
-                <div className="pt-3 sm:pt-4 space-y-2">
-                  <p className="text-sm sm:text-base font-medium text-foreground">Seu amigo é um:</p>
-                  <div className="flex gap-2 sm:gap-3">
-                    <Button
-                      type="button"
-                      variant={friendGender === "homem" ? "default" : "outline"}
-                      onClick={() => setFriendGender("homem")}
-                      className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
-                    >
-                      Homem
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={friendGender === "mulher" ? "default" : "outline"}
-                      onClick={() => setFriendGender("mulher")}
-                      className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
-                    >
-                      Mulher
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="pt-3 sm:pt-4 space-y-2">
-                  <p className="text-sm sm:text-base font-medium text-foreground">Escolha o cenário:</p>
-                  <select
-                    className="w-full rounded-md border border-secondary bg-background px-4 py-3 sm:px-3 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 min-h-[44px] sm:min-h-0"
-                    value={sceneKey ?? ""}
-                    onChange={(e) => setSceneKey(e.target.value || null)}
-                  >
-                    <option value="">Selecione um cenário...</option>
-                    {SCENARIO_OPTIONS.map((opt) => (
-                      <option key={opt.key} value={opt.key}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-6 sm:mt-8">
                   <Button 
                     variant="default" 
-                    disabled={!image || !friendGender || !sceneKey} 
+                    disabled={!image} 
                     onClick={() => handleGenerateLLM('bolsonaro')}
                     className="bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
@@ -206,7 +165,7 @@ export default function Home() {
                   </Button>
                   <Button 
                     variant="secondary" 
-                    disabled={!image || !friendGender || !sceneKey} 
+                    disabled={!image} 
                     onClick={() => handleGenerateLLM('lula')}
                     className="bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
