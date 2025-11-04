@@ -71,22 +71,31 @@ export default function Home() {
       formData.append('friendImage', uploadedImageFile);
 
       // 3. (PRD 6.3) Adicionar a Imagem Base e Máscara
-      // Criar arquivos "dummy" apenas para o nome (a API mock vai usar o nome)
-      const baseImageName = 
+      // Carregar as imagens reais do servidor
+      const baseImagePath = 
         politician === 'bolsonaro' 
-          ? 'bolsonaro_base.png' 
-          : 'lula_base.png';
+          ? '/base_images/bolsonaro_base.png' 
+          : '/base_images/lula_base.png';
           
-      const maskImageName = 
+      const maskImagePath = 
         politician === 'bolsonaro' 
-          ? 'bolsonaro_mask.png' 
-          : 'lula_mask.png';
+          ? '/base_images/bolsonaro_mask.png' 
+          : '/base_images/lula_mask.png';
 
-      const dummyBaseFile = new File([], baseImageName);
-      const dummyMaskFile = new File([], maskImageName);
+      // Carregar as imagens como Files
+      const [baseImageResponse, maskImageResponse] = await Promise.all([
+        fetch(baseImagePath),
+        fetch(maskImagePath),
+      ]);
 
-      formData.append('baseImage', dummyBaseFile);
-      formData.append('maskImage', dummyMaskFile);
+      const baseImageBlob = await baseImageResponse.blob();
+      const maskImageBlob = await maskImageResponse.blob();
+
+      const baseImageFile = new File([baseImageBlob], baseImagePath.split('/').pop() || 'base.png', { type: 'image/png' });
+      const maskImageFile = new File([maskImageBlob], maskImagePath.split('/').pop() || 'mask.png', { type: 'image/png' });
+
+      formData.append('baseImage', baseImageFile);
+      formData.append('maskImage', maskImageFile);
 
       // 4. (PRD 6.3) Fazer a chamada de API
       const response = await fetch('/api/generate', {
