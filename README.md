@@ -98,6 +98,26 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgoogle-gemini%2Fgemini-image-editing-nextjs-quickstart&env=GEMINI_API_KEY&envDescription=Create%20an%20account%20and%20generate%20an%20API%20key&envLink=https%3A%2F%2Faistudio.google.com%2Fapp%2Fu%2F0%2Fapikey&demo-url=https%3A%2F%2Fhuggingface.co%2Fspaces%2Fphilschmid%2Fimage-generation-editing)
 
+**Configuração de Variáveis de Ambiente na Vercel:**
+
+Para usar a funcionalidade completa de geração de imagens, configure as seguintes variáveis de ambiente no painel da Vercel:
+
+1. **GEMINI_API_KEY** - Chave da API do Gemini (obtenha em https://ai.google.dev/gemini-api/docs/api-key)
+2. **GOOGLE_CLOUD_PROJECT** - ID do seu projeto Google Cloud
+3. **GOOGLE_CLOUD_LOCATION** - Região do Vertex AI (ex: `us-central1`, `us-east1`, `europe-west1`)
+
+**Nota sobre Autenticação do Vertex AI:**
+
+Para usar o Vertex AI na Vercel, você também precisa configurar a autenticação:
+
+- **Opção 1 (Recomendado)**: Use Service Account Key
+  1. Crie uma Service Account no Google Cloud Console
+  2. Baixe a chave JSON
+  3. Adicione como variável de ambiente `GOOGLE_APPLICATION_CREDENTIALS_JSON` (conteúdo do JSON) na Vercel
+  4. O código deve criar o arquivo temporariamente (ou use uma biblioteca que aceita JSON diretamente)
+
+- **Opção 2**: Use Application Default Credentials (ADC) - requer configuração adicional no ambiente de build
+
 ### Docker
 
 1. Build the Docker image:

@@ -13,14 +13,19 @@ import {
 // ----------------------------------------------------
 
 // 1. Cliente Vertex AI (para Inpainting/Imagen)
-const vertexAI = new VertexAI({
-  project: process.env.GOOGLE_CLOUD_PROJECT || '',
-  location: process.env.GOOGLE_CLOUD_LOCATION || '',
-});
+// Inicialização apenas se as variáveis estiverem configuradas
+let imagenModel: ReturnType<VertexAI['preview']['getGenerativeModel']> | null = null;
 
-const imagenModel = vertexAI.preview.getGenerativeModel({
-  model: 'imagegeneration@0.0.6', // Modelo de edição/geração de imagem (Imagen)
-});
+if (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_LOCATION) {
+  const vertexAI = new VertexAI({
+    project: process.env.GOOGLE_CLOUD_PROJECT,
+    location: process.env.GOOGLE_CLOUD_LOCATION,
+  });
+
+  imagenModel = vertexAI.preview.getGenerativeModel({
+    model: 'imagegeneration@0.0.6', // Modelo de edição/geração de imagem (Imagen)
+  });
+}
 
 // 2. Cliente Gemini (para Análise de Visão)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -82,6 +87,14 @@ export async function POST(request: Request) {
 
     // --- ETAPA DE IA 2: Inpainting (Vertex AI / Imagen) ---
     // (Usar a descrição gerada para preencher a máscara)
+
+    // Verificar se VertexAI está configurado
+    if (!imagenModel) {
+      return NextResponse.json(
+        { error: 'Vertex AI não está configurado. Configure GOOGLE_CLOUD_PROJECT e GOOGLE_CLOUD_LOCATION nas variáveis de ambiente.' },
+        { status: 500 },
+      );
+    }
 
     console.log('Iniciando Etapa 2: Inpainting (Vertex AI)');
     const baseImagePart = await fileToGenerativePart(baseImageFile);
