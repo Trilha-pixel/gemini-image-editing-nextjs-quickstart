@@ -102,11 +102,13 @@ export async function POST(request: Request) {
 
     // Acessar a resposta de forma segura
     let imageBase64: string | undefined;
-    const response = inpaintingResponse as any;
+    const response = inpaintingResponse as unknown;
     if (Array.isArray(response) && response.length > 0) {
-      imageBase64 = response[0]?.imageBytes || response[0]?.bytes || response[0]?.data;
+      const firstItem = response[0] as Record<string, unknown>;
+      imageBase64 = (firstItem?.imageBytes as string) || (firstItem?.bytes as string) || (firstItem?.data as string);
     } else if (response && typeof response === 'object') {
-      imageBase64 = response.imageBytes || response.bytes || response.data;
+      const responseObj = response as Record<string, unknown>;
+      imageBase64 = (responseObj.imageBytes as string) || (responseObj.bytes as string) || (responseObj.data as string);
     }
     
     if (!imageBase64) {
