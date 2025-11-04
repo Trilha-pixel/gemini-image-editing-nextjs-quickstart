@@ -117,126 +117,154 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-4 sm:p-6 md:p-8">
-      <Card className="w-full max-w-4xl border-0 bg-card shadow-none">
-        <CardHeader className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6">
-          <CardTitle className="flex items-center gap-2 text-foreground font-bold text-2xl sm:text-3xl md:text-4xl text-center">
-            <Wand2 className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-primary" />
-            Gabinete da Zoeira
-          </CardTitle>
-          <span className="text-sm sm:text-base md:text-lg text-muted-foreground text-center px-2">
-            Crie a foto que seu amigo não quer que ninguém veja.
-          </span>
-        </CardHeader>
-        <CardContent className="space-y-4 sm:space-y-6 pt-4 sm:pt-6 w-full px-4 sm:px-6">
-          {error && (
-            <div className="p-3 sm:p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
-              {error}
-            </div>
-          )}
+    <main className="min-h-screen relative z-10 py-8 sm:py-12 md:py-16 px-4 sm:px-6 md:px-8">
+      {/* Header Principal */}
+      <header className="text-center mb-8 sm:mb-12 md:mb-16">
+        <h1 className={`font-bebas-neue text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white font-black drop-shadow-2xl mb-4`} style={{ fontFamily: 'var(--font-bebas-neue), sans-serif', textShadow: '0 4px 12px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.6)' }}>
+          <Wand2 className="inline-block w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 text-green-500 mr-3 sm:mr-4 drop-shadow-lg" />
+          Gabinete da Zoeira
+        </h1>
+        <p className="text-xl sm:text-2xl md:text-3xl text-white drop-shadow-xl font-medium" style={{ textShadow: '0 2px 8px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.5)' }}>
+          Seu amigo em companhias... questionáveis.
+        </p>
+      </header>
 
-          {!displayImage && !isLoading ? (
-            <>
-              <ImageUpload
-                onImageSelect={handleImageSelect}
-                currentImage={currentImage}
-              />
-              <div className="pt-3 sm:pt-4 space-y-2">
-                <p className="text-sm sm:text-base font-medium text-foreground">Seu amigo é um:</p>
-                <div className="flex gap-2 sm:gap-3">
-                  <Button
-                    type="button"
-                    variant={friendGender === "homem" ? "default" : "outline"}
-                    onClick={() => setFriendGender("homem")}
-                    className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
-                  >
-                    Homem
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={friendGender === "mulher" ? "default" : "outline"}
-                    onClick={() => setFriendGender("mulher")}
-                    className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
-                  >
-                    Mulher
-                  </Button>
+      {/* Hero Section - Duas Colunas */}
+      <section className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 lg:gap-12">
+          {/* Coluna da Esquerda - Formulário */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-xl">
+            {error && (
+              <div className="p-3 sm:p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200 mb-6">
+                {error}
+              </div>
+            )}
+
+            {isLoading ? (
+              <div
+                role="status"
+                className="flex flex-col items-center justify-center min-h-[400px] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg animate-pulse p-8"
+              >
+                <div className="relative">
+                  <ImageIcon className="w-16 h-16 text-gray-400 animate-bounce" />
+                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
                 </div>
+                <p className="mt-6 text-lg font-medium text-foreground text-center px-4">
+                  {loadingText}
+                </p>
               </div>
-              <div className="pt-3 sm:pt-4 space-y-2">
-                <p className="text-sm sm:text-base font-medium text-foreground">Escolha o cenário:</p>
-                <select
-                  className="w-full rounded-md border border-secondary bg-background px-4 py-3 sm:px-3 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 min-h-[44px] sm:min-h-0"
-                  value={sceneKey ?? ""}
-                  onChange={(e) => setSceneKey(e.target.value || null)}
-                >
-                  <option value="">Selecione um cenário...</option>
-                  {SCENARIO_OPTIONS.map((opt) => (
-                    <option key={opt.key} value={opt.key}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 pt-3 sm:pt-4">
-                <Button 
-                  variant="default" 
-                  disabled={!image || !friendGender || !sceneKey} 
-                  onClick={() => handleGenerateLLM('bolsonaro')}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 sm:py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
-                >
-                  Gerar com Bolsonaro
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  disabled={!image || !friendGender || !sceneKey} 
-                  onClick={() => handleGenerateLLM('lula')}
-                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 sm:py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
-                >
-                  Gerar com Lula
-                </Button>
-              </div>
-            </>
-          ) : isLoading ? (
-            <div
-              role="status"
-              className="flex flex-col items-center justify-center mx-auto min-h-[300px] sm:min-h-[400px] max-w-sm bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg animate-pulse p-8"
-            >
-              <div className="relative">
-                <ImageIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 animate-bounce" />
-                <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
-              </div>
-              <p className="mt-4 sm:mt-6 text-base sm:text-lg font-medium text-foreground text-center px-4">
-                {loadingText}
-              </p>
-            </div>
-          ) : (
-            <>
-              <ImageResultDisplay
-                imageUrl={displayImage || ""}
-                description={description}
-                onReset={handleReset}
-                conversationHistory={history}
-              />
-              {resultImage && (
-                <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    onClick={handleShare}
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0 flex-1 sm:flex-initial"
-                  >
-                    Compartilhar no WhatsApp
-                  </Button>
-                  <a href={resultImage} download="meme-gerado.jpg" className="flex-1 sm:flex-initial">
-                    <Button 
-                      variant="outline"
-                      className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 sm:py-2 rounded-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
+            ) : (
+              <div className="space-y-4 sm:space-y-6">
+                <ImageUpload
+                  onImageSelect={handleImageSelect}
+                  currentImage={currentImage}
+                />
+                
+                <div className="pt-3 sm:pt-4 space-y-2">
+                  <p className="text-sm sm:text-base font-medium text-foreground">Seu amigo é um:</p>
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button
+                      type="button"
+                      variant={friendGender === "homem" ? "default" : "outline"}
+                      onClick={() => setFriendGender("homem")}
+                      className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
                     >
-                      Baixar Imagem
+                      Homem
                     </Button>
-                  </a>
+                    <Button
+                      type="button"
+                      variant={friendGender === "mulher" ? "default" : "outline"}
+                      onClick={() => setFriendGender("mulher")}
+                      className="flex-1 sm:flex-initial min-h-[44px] text-base sm:text-sm"
+                    >
+                      Mulher
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+
+                <div className="pt-3 sm:pt-4 space-y-2">
+                  <p className="text-sm sm:text-base font-medium text-foreground">Escolha o cenário:</p>
+                  <select
+                    className="w-full rounded-md border border-secondary bg-background px-4 py-3 sm:px-3 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 min-h-[44px] sm:min-h-0"
+                    value={sceneKey ?? ""}
+                    onChange={(e) => setSceneKey(e.target.value || null)}
+                  >
+                    <option value="">Selecione um cenário...</option>
+                    {SCENARIO_OPTIONS.map((opt) => (
+                      <option key={opt.key} value={opt.key}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-3 sm:pt-4">
+                  <Button 
+                    variant="default" 
+                    disabled={!image || !friendGender || !sceneKey} 
+                    onClick={() => handleGenerateLLM('bolsonaro')}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
+                  >
+                    Gerar com Bolsonaro
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    disabled={!image || !friendGender || !sceneKey} 
+                    onClick={() => handleGenerateLLM('lula')}
+                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
+                  >
+                    Gerar com Lula
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Coluna da Direita - A Vitrine/Resultado */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-xl min-h-[400px] flex flex-col">
+            {displayImage ? (
+              <div className="flex-1 flex flex-col">
+                <ImageResultDisplay
+                  imageUrl={displayImage || ""}
+                  description={description}
+                  onReset={handleReset}
+                  conversationHistory={history}
+                />
+                {resultImage && (
+                  <div className="pt-4 flex flex-col sm:flex-row gap-3 mt-auto">
+                    <Button 
+                      onClick={handleShare}
+                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-base sm:text-lg w-full sm:w-auto min-h-[48px] sm:min-h-0 flex-1 sm:flex-initial"
+                    >
+                      Compartilhar no WhatsApp
+                    </Button>
+                    <a href={resultImage} download="meme-gerado.jpg" className="flex-1 sm:flex-initial">
+                      <Button 
+                        variant="outline"
+                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 sm:py-2 rounded-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
+                      >
+                        Baixar Imagem
+                      </Button>
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-center">
+                <div className="space-y-4">
+                  <div className="w-24 h-24 mx-auto bg-gradient-to-br from-green-100 to-red-100 rounded-full flex items-center justify-center">
+                    <Wand2 className="w-12 h-12 text-gray-400" />
+                  </div>
+                  <p className="text-lg sm:text-xl font-medium text-gray-600">
+                    Seus memes aparecerão aqui!
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Use o formulário ao lado para gerar sua primeira imagem
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -10,6 +10,9 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  .font-bebas-neue {
+    font-family: var(--font-bebas-neue), 'Bebas Neue', sans-serif;
+  }
 }
 
 @layer base {
