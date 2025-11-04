@@ -250,7 +250,6 @@ export async function POST(request: Request) {
           'https://aiplatform.googleapis.com/v1/publishers/google/models/imagen:predict',
         ];
 
-        let imagenData: ImagenResponse | null = null;
 
         for (const endpoint of imagenEndpoints) {
           try {
