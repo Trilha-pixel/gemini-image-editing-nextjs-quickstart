@@ -7,13 +7,7 @@ import { ImageIcon, Wand2 } from "lucide-react";
 import { HistoryItem } from "@/lib/types";
 import { type PoliticalFigure } from "@/lib/utils";
 
-const loadingTexts = [
-  "Imprimindo a faixa presidencial...",
-  "Convocando a militância...",
-  "Calculando o PIB da zoeira...",
-  "Vazando os áudios...",
-  "Ajustando o teleprompter..."
-];
+const loadingText = "Criando sua obra-prima...";
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
@@ -23,7 +17,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
-  const [loadingText, setLoadingText] = useState("");
 
   const handleImageSelect = (imageData: string) => {
     setImage(imageData || null);
@@ -48,40 +41,22 @@ export default function Home() {
 // Get the latest image to display (prefer mocked/API result image, then generated)
   const displayImage = resultImage || generatedImage;
 
-  const handleGenerateLLM = async (politicalFigure: PoliticalFigure) => {
+  const handleGenerateMock = (politician: 'bolsonaro' | 'lula') => {
     if (!image) return;
-    try {
-      setLoadingText(loadingTexts[Math.floor(Math.random() * loadingTexts.length)]);
-      setIsLoading(true);
-      setError(null);
-      setResultImage(null);
+    
+    setIsLoading(true);
+    setError(null);
+    setResultImage(null);
 
-      const response = await fetch("/api/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          politicalFigure,
-          image
-        })
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Falha ao gerar imagem");
-      }
-
-      const data = await response.json();
-      if (data?.image) {
-        setResultImage(data.image);
-        setDescription(data.description || null);
-      } else {
-        throw new Error("Resposta sem imagem");
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro inesperado");
-    } finally {
+    // Simulação de 2 segundos
+    setTimeout(() => {
+      const mockImage = politician === 'bolsonaro'
+        ? '/mocks/bolsonaro_result_mock.jpg.png'
+        : '/mocks/bolsonaro_result_mock.jpg.png'; // Usando a mesma imagem por enquanto até ter a do Lula
+      
+      setResultImage(mockImage);
       setIsLoading(false);
-    }
+    }, 2000);
   };
 
   async function handleShare() {
@@ -108,6 +83,17 @@ export default function Home() {
       // Fallback para navegadores que não suportam (ex: Desktop Firefox)
       alert("Seu navegador não suporta compartilhamento direto. Por favor, baixe a imagem e compartilhe manualmente.");
     }
+  }
+
+  function handleDownload() {
+    if (!resultImage) return;
+    
+    const link = document.createElement('a');
+    link.href = resultImage;
+    link.download = 'meme_gerado.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   return (
@@ -158,18 +144,18 @@ export default function Home() {
                   <Button 
                     variant="default" 
                     disabled={!image} 
-                    onClick={() => handleGenerateLLM('bolsonaro')}
+                    onClick={() => handleGenerateMock('bolsonaro')}
                     className="bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
-                    🇧🇷 Gerar com Bolsonaro
+                    [Gerar com Bolsonaro]
                   </Button>
                   <Button 
                     variant="secondary" 
                     disabled={!image} 
-                    onClick={() => handleGenerateLLM('lula')}
+                    onClick={() => handleGenerateMock('lula')}
                     className="bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
-                    🚩 Gerar com Lula
+                    [Gerar com Lula]
                   </Button>
                 </div>
               </div>
@@ -194,14 +180,13 @@ export default function Home() {
                     >
                       Compartilhar no WhatsApp
                     </Button>
-                    <a href={resultImage} download="meme-gerado.jpg" className="flex-1 sm:flex-initial">
-                      <Button 
-                        variant="outline"
-                        className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 sm:py-2 rounded-lg w-full sm:w-auto min-h-[48px] sm:min-h-0"
-                      >
-                        Baixar Imagem
-                      </Button>
-                    </a>
+                    <Button 
+                      onClick={handleDownload}
+                      variant="outline"
+                      className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 sm:py-2 rounded-lg w-full sm:w-auto min-h-[48px] sm:min-h-0 flex-1 sm:flex-initial"
+                    >
+                      [Baixar Imagem]
+                    </Button>
                   </div>
                 )}
               </div>
