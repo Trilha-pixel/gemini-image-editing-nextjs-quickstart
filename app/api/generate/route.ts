@@ -115,7 +115,10 @@ interface ImagenResponse {
 // --- Helper para processar resposta do Imagen ---
 async function processImagenResponse(imagenData: unknown): Promise<NextResponse> {
   console.log('📦 Processando resposta do Vertex AI Imagen');
-  console.log('📋 Estrutura completa da resposta:', JSON.stringify(imagenData, null, 2));
+  
+  // Log completo da resposta (limitado a 2000 chars para não sobrecarregar)
+  const responseStr = JSON.stringify(imagenData, null, 2);
+  console.log('📋 Estrutura completa da resposta (primeiros 2000 chars):', responseStr.substring(0, 2000));
   
   // A resposta pode ter diferentes estruturas, tentar todas
   const response = imagenData as Record<string, unknown>;
@@ -126,23 +129,58 @@ async function processImagenResponse(imagenData: unknown): Promise<NextResponse>
   // Caminho 1: predictions no topo
   if (Array.isArray(response.predictions)) {
     predictions = response.predictions as ImagenPrediction[];
+    console.log('✅ Encontrado: predictions no topo');
   }
   // Caminho 2: predictions dentro de data
-  else if (response.data && Array.isArray((response.data as Record<string, unknown>).predictions)) {
-    predictions = ((response.data as Record<string, unknown>).predictions as ImagenPrediction[]);
+  else if (response.data) {
+    const data = response.data as Record<string, unknown>;
+    if (Array.isArray(data.predictions)) {
+      predictions = data.predictions as ImagenPrediction[];
+      console.log('✅ Encontrado: predictions dentro de data');
+    } else if (Array.isArray(data)) {
+      predictions = data as ImagenPrediction[];
+      console.log('✅ Encontrado: data é um array direto');
+    }
   }
-  // Caminho 3: resposta direta é um array
-  else if (Array.isArray(response)) {
+  // Caminho 3: resposta direta é um array (mas precisa ter conteúdo)
+  else if (Array.isArray(response) && response.length > 0) {
     predictions = response as ImagenPrediction[];
+    console.log('✅ Encontrado: resposta é um array direto');
   }
-  // Caminho 4: imagem direta na resposta
+  // Caminho 3b: resposta é um array vazio (problema)
+  else if (Array.isArray(response) && response.length === 0) {
+    console.error('❌ Resposta é um array vazio!');
+    throw new Error('A resposta do Imagen é um array vazio. Isso pode indicar que o modelo não gerou nenhuma imagem ou houve um erro no processamento.');
+  }
+  // Caminho 4: imagem direta na resposta (sem array)
   else if (response.bytesBase64Encoded || response.imageBytes || response.image) {
     predictions = [response as ImagenPrediction];
+    console.log('✅ Encontrado: imagem direta na resposta');
+  }
+  // Caminho 5: verificar se há algum campo que contenha a imagem
+  else {
+    // Tentar encontrar qualquer campo que possa conter a imagem
+    for (const [key, value] of Object.entries(response)) {
+      if (value && typeof value === 'object') {
+        const obj = value as Record<string, unknown>;
+        if (obj.bytesBase64Encoded || obj.imageBytes || obj.image || (Array.isArray(value) && value.length > 0)) {
+          if (Array.isArray(value)) {
+            predictions = value as ImagenPrediction[];
+          } else {
+            predictions = [obj as ImagenPrediction];
+          }
+          console.log(`✅ Encontrado: imagem no campo "${key}"`);
+          break;
+        }
+      }
+    }
   }
   
   if (predictions.length === 0) {
-    console.error('❌ Estrutura da resposta não reconhecida:', JSON.stringify(imagenData, null, 2));
-    throw new Error(`A resposta do Imagen não contém predictions. Estrutura recebida: ${JSON.stringify(Object.keys(response))}`);
+    console.error('❌ Estrutura da resposta não reconhecida');
+    console.error('📋 Chaves disponíveis:', Object.keys(response));
+    console.error('📋 Resposta completa:', responseStr.substring(0, 1000));
+    throw new Error(`A resposta do Imagen não contém predictions. Estrutura recebida: ${JSON.stringify(Object.keys(response))}. Resposta completa (primeiros 500 chars): ${responseStr.substring(0, 500)}`);
   }
 
   // A estrutura pode variar, tentar diferentes formatos
@@ -203,6 +241,8 @@ export async function POST(request: Request) {
     // Tentar diferentes modelos em ordem de preferência
     const modelsToTry = [
       'gemini-2.0-flash-exp',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
       'gemini-1.5-flash-002',
       'gemini-1.5-pro-002',
     ];
@@ -348,6 +388,12 @@ export async function POST(request: Request) {
                 aspectRatio: '1:1',
               },
             };
+
+            console.log('📤 Enviando requisição para Imagen');
+            console.log('📝 Prompt:', inpaintingPrompt.substring(0, 200));
+            console.log('🖼️ Tamanho imagem base:', baseImageBase64.data.length, 'chars');
+            console.log('🎭 Tamanho máscara:', maskImageBase64.data.length, 'chars');
+            console.log('👤 Tamanho referência:', friendImageBase64.data.length, 'chars');
 
             const imagenResponse = await fetch(fullEndpoint, {
               method: 'POST',
