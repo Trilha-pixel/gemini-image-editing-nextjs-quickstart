@@ -11,6 +11,7 @@ const loadingText = "Criando sua obra-prima...";
 
 export default function Home() {
   const [image, setImage] = useState<string | null>(null);
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -18,14 +19,20 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
 
-  const handleImageSelect = (imageData: string) => {
+  const handleImageSelect = (imageData: string, file?: File) => {
     setImage(imageData || null);
+    setUploadedImageFile(file || null);
   };
 
   
 
   const handleReset = () => {
+    // Liberar ObjectURL para evitar vazamento de memória
+    if (resultImage && resultImage.startsWith('blob:')) {
+      URL.revokeObjectURL(resultImage);
+    }
     setImage(null);
+    setUploadedImageFile(null);
     setGeneratedImage(null);
     setDescription(null);
     setIsLoading(false);
@@ -41,22 +48,74 @@ export default function Home() {
 // Get the latest image to display (prefer mocked/API result image, then generated)
   const displayImage = resultImage || generatedImage;
 
-  const handleGenerateMock = (politician: 'bolsonaro' | 'lula') => {
-    if (!image) return;
-    
+  const handleGenerate = async (politician: 'bolsonaro' | 'lula') => {
+    // 0. (PRD 6.3) Verificar se a imagem do amigo existe
+    if (!uploadedImageFile) {
+      alert('Por favor, envie a foto do seu amigo primeiro.');
+      return;
+    }
+
+    // 1. (PRD 4.4) Ativar o loading
     setIsLoading(true);
     setError(null);
-    setResultImage(null);
+    // Liberar ObjectURL anterior para evitar vazamento de memória
+    if (resultImage && resultImage.startsWith('blob:')) {
+      URL.revokeObjectURL(resultImage);
+    }
+    setResultImage(null); // Limpar resultado anterior
 
-    // Simulação de 2 segundos
-    setTimeout(() => {
-      const mockImage = politician === 'bolsonaro'
-        ? '/mocks/bolsonaro_result_mock.jpg.png'
-        : '/mocks/bolsonaro_result_mock.jpg.png'; // Usando a mesma imagem por enquanto até ter a do Lula
+    try {
+      // 2. (PRD 6.3) Preparar o FormData
+      const formData = new FormData();
       
-      setResultImage(mockImage);
+      // Adicionar a imagem do amigo
+      formData.append('friendImage', uploadedImageFile);
+
+      // 3. (PRD 6.3) Adicionar a Imagem Base e Máscara
+      // Criar arquivos "dummy" apenas para o nome (a API mock vai usar o nome)
+      const baseImageName = 
+        politician === 'bolsonaro' 
+          ? 'bolsonaro_base.png' 
+          : 'lula_base.png';
+          
+      const maskImageName = 
+        politician === 'bolsonaro' 
+          ? 'bolsonaro_mask.png' 
+          : 'lula_mask.png';
+
+      const dummyBaseFile = new File([], baseImageName);
+      const dummyMaskFile = new File([], maskImageName);
+
+      formData.append('baseImage', dummyBaseFile);
+      formData.append('maskImage', dummyMaskFile);
+
+      // 4. (PRD 6.3) Fazer a chamada de API
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // 5. (PRD 6.3) Tratar a resposta
+      if (!response.ok) {
+        // Tentar ler o JSON de erro
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(errorData.error || 'A API retornou um erro.');
+      }
+
+      // 6. (PRD 6.3) Sucesso: Converter a imagem
+      const imageBlob = await response.blob();
+      const imageObjectURL = URL.createObjectURL(imageBlob);
+      
+      // Definir a imagem de resultado (F-05)
+      setResultImage(imageObjectURL);
+
+    } catch (error) {
+      console.error('Erro ao gerar meme:', error);
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      // 7. (PRD 4.4) Desativar o loading
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   async function handleShare() {
@@ -88,6 +147,7 @@ export default function Home() {
   function handleDownload() {
     if (!resultImage) return;
     
+    // Como resultImage agora é um ObjectURL (blob), podemos usar diretamente
     const link = document.createElement('a');
     link.href = resultImage;
     link.download = 'meme_gerado.png';
@@ -143,16 +203,16 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row gap-3 mt-6 sm:mt-8">
                   <Button 
                     variant="default" 
-                    disabled={!image} 
-                    onClick={() => handleGenerateMock('bolsonaro')}
+                    disabled={!uploadedImageFile || isLoading} 
+                    onClick={() => handleGenerate('bolsonaro')}
                     className="bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
                     [Gerar com Bolsonaro]
                   </Button>
                   <Button 
                     variant="secondary" 
-                    disabled={!image} 
-                    onClick={() => handleGenerateMock('lula')}
+                    disabled={!uploadedImageFile || isLoading} 
+                    onClick={() => handleGenerate('lula')}
                     className="bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg sm:text-xl w-full sm:w-auto min-h-[56px] sm:min-h-[56px] transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none"
                   >
                     [Gerar com Lula]

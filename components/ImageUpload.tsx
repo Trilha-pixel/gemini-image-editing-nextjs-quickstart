@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Upload as UploadIcon, Image as ImageIcon, X, HelpCircle } from "lucide-react";
 
 interface ImageUploadProps {
-  onImageSelect: (imageData: string) => void;
+  onImageSelect: (imageData: string, file?: File) => void;
   currentImage: string | null;
   onError?: (error: string) => void;
 }
@@ -112,7 +112,7 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
       try {
         // Compress and resize the image before converting to base64
         const compressedImage = await compressImage(file, 1920, 1920, 0.85);
-        onImageSelect(compressedImage);
+        onImageSelect(compressedImage, file);
       } catch (error) {
         onError?.(
           error instanceof Error
@@ -139,7 +139,7 @@ export function ImageUpload({ onImageSelect, currentImage, onError }: ImageUploa
 
   const handleRemove = () => {
     setSelectedFile(null);
-    onImageSelect("");
+    onImageSelect("", null);
   };
 
   return (
