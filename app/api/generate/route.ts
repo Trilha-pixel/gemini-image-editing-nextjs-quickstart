@@ -3,11 +3,12 @@ import { GoogleGenAI } from '@google/genai';
 import { GoogleAuth } from 'google-auth-library';
 
 // --- Configuração dos Clientes de IA ---
-// NOTA: Isso requer variáveis de ambiente em .env.local:
+// NOTA: Isso requer variáveis de ambiente em .env.local ou Vercel:
 // GEMINI_API_KEY = "sua-chave-api-gemini-aqui"
-// GOOGLE_CLOUD_PROJECT = "seu-projeto-gcloud"
-// GOOGLE_CLOUD_LOCATION = "us-central1"
-// GOOGLE_APPLICATION_CREDENTIALS_JSON = "conteúdo do JSON da service account" (opcional)
+// VERTEX_AI_API_KEY = "sua-chave-api-vertex-ai-aqui" (nova - preferencial)
+// GOOGLE_CLOUD_PROJECT = "seu-projeto-gcloud" (fallback se não usar API Key)
+// GOOGLE_CLOUD_LOCATION = "us-central1" (fallback se não usar API Key)
+// GOOGLE_APPLICATION_CREDENTIALS_JSON = "conteúdo do JSON da service account" (fallback)
 // ----------------------------------------------------
 
 // Cliente Gemini (para Análise de Visão)
@@ -54,6 +55,41 @@ async function getAccessToken(): Promise<string> {
   return accessToken.token;
 }
 
+// --- Helper para processar resposta do Imagen ---
+async function processImagenResponse(imagenData: any): Promise<NextResponse> {
+  console.log('📦 Processando resposta do Vertex AI Imagen');
+  
+  const predictions = imagenData.predictions || [];
+  if (predictions.length === 0) {
+    throw new Error('A resposta do Imagen não contém predictions');
+  }
+
+  // A estrutura pode variar, tentar diferentes formatos
+  let imageBase64: string | undefined;
+  
+  if (predictions[0].bytesBase64Encoded) {
+    imageBase64 = predictions[0].bytesBase64Encoded;
+  } else if (predictions[0].imageBytes) {
+    imageBase64 = predictions[0].imageBytes;
+  } else if (predictions[0].generatedImage) {
+    imageBase64 = predictions[0].generatedImage.bytesBase64Encoded || predictions[0].generatedImage.imageBytes;
+  }
+
+  if (!imageBase64) {
+    console.error('Estrutura da resposta:', JSON.stringify(predictions[0], null, 2));
+    throw new Error('A resposta do Imagen não contém uma imagem gerada no formato esperado');
+  }
+
+  const imageBytes = Buffer.from(imageBase64, 'base64');
+  console.log('✅ Inpainting concluído com sucesso!');
+
+  return new NextResponse(imageBytes, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/png',
+    },
+  });
+}
 
 // --- A Rota da API (POST) ---
 export async function POST(request: Request) {
@@ -150,48 +186,125 @@ export async function POST(request: Request) {
 
     console.log('Iniciando Etapa 2: Inpainting Real (Vertex AI Imagen)');
     
-    // Verificar se temos as credenciais necessárias
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    
-    if (!projectId) {
-      return NextResponse.json(
-        { error: 'GOOGLE_CLOUD_PROJECT não configurado. Configure nas variáveis de ambiente da Vercel.' },
-        { status: 500 },
-      );
-    }
-
     // Preparar as imagens em base64 (friendImageBase64 já foi criado na Etapa 1)
     const baseImageBase64 = await fileToBase64(baseImageFile);
     const maskImageBase64 = await fileToBase64(maskImageFile);
 
+    // Criar prompt de inpainting que preserva a identidade
+    const inpaintingPrompt = `${finalInpaintingPrompt}. A pessoa deve aparecer EXATAMENTE como na imagem de referência, mantendo todas as características faciais idênticas.`;
+
     try {
-      // Obter token de autenticação usando Service Account
-      console.log('🔑 Obtendo token de autenticação...');
+      // Tentar primeiro com API Key (mais simples)
+      const vertexAIApiKey = process.env.VERTEX_AI_API_KEY;
+      
+      if (vertexAIApiKey) {
+        console.log('🔑 Usando Vertex AI API Key...');
+        
+        // Tentar diferentes endpoints para Imagen com API Key
+        const imagenEndpoints = [
+          'https://aiplatform.googleapis.com/v1/publishers/google/models/imagegeneration@006:predict',
+          'https://aiplatform.googleapis.com/v1/publishers/google/models/imagegeneration@005:predict',
+          'https://aiplatform.googleapis.com/v1/publishers/google/models/imagen-3:predict',
+          'https://aiplatform.googleapis.com/v1/publishers/google/models/imagen:predict',
+        ];
+
+        let imagenData: any = null;
+        let imagenError: Error | null = null;
+
+        for (const endpoint of imagenEndpoints) {
+          try {
+            const fullEndpoint = `${endpoint}?key=${vertexAIApiKey}`;
+            console.log(`📡 Tentando endpoint: ${endpoint}`);
+
+            const requestBody = {
+              instances: [
+                {
+                  prompt: inpaintingPrompt,
+                  image: {
+                    bytesBase64Encoded: baseImageBase64.data,
+                  },
+                  mask: {
+                    image: {
+                      bytesBase64Encoded: maskImageBase64.data,
+                    },
+                  },
+                  referenceImage: {
+                    bytesBase64Encoded: friendImageBase64.data,
+                  },
+                },
+              ],
+              parameters: {
+                sampleCount: 1,
+                guidanceScale: 12,
+                aspectRatio: '1:1',
+              },
+            };
+
+            const imagenResponse = await fetch(fullEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
+            });
+
+            if (!imagenResponse.ok) {
+              const errorText = await imagenResponse.text();
+              console.error(`❌ Endpoint falhou (${imagenResponse.status}):`, errorText);
+              
+              if (imagenResponse.status === 403 || imagenResponse.status === 404) {
+                imagenError = new Error(`Endpoint ${endpoint}: ${errorText}`);
+                continue; // Tentar próximo endpoint
+              }
+              
+              throw new Error(`Vertex AI retornou erro ${imagenResponse.status}: ${errorText}`);
+            }
+
+            imagenData = await imagenResponse.json();
+            console.log(`✅ Endpoint funcionou com API Key!`);
+            return await processImagenResponse(imagenData);
+            
+          } catch (error) {
+            if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
+              imagenError = error;
+              continue;
+            }
+            throw error;
+          }
+        }
+
+        // Se nenhum endpoint funcionou com API Key, tentar Service Account como fallback
+        console.log('⚠️ API Key não funcionou, tentando Service Account como fallback...');
+      }
+
+      // Fallback: usar Service Account (código original)
+      console.log('🔑 Usando Service Account (fallback)...');
+      
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+      
+      if (!projectId) {
+        throw new Error('GOOGLE_CLOUD_PROJECT não configurado. Configure VERTEX_AI_API_KEY ou GOOGLE_CLOUD_PROJECT nas variáveis de ambiente.');
+      }
+
       const accessToken = await getAccessToken();
       console.log('✅ Token obtido com sucesso');
 
-      // Endpoint da API REST do Vertex AI Imagen
-      // Tentar múltiplas versões do modelo em ordem de preferência
+      // Usar Service Account com endpoint baseado em projeto
       const modelVersions = [
-        'imagegeneration@006', // Imagen 3 mais recente
-        'imagegeneration@005', // Imagen 3 anterior
-        'imagegeneration@004', // Imagen 3 anterior
-        'imagegeneration@003', // Imagen 3 anterior
+        'imagegeneration@006',
+        'imagegeneration@005',
+        'imagegeneration@004',
+        'imagegeneration@003',
       ];
 
       let imagenError: Error | null = null;
       let imagenData: any = null;
 
-      // Tentar cada versão do modelo
       for (const modelVersion of modelVersions) {
         const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:predict`;
         
         console.log(`📡 Tentando modelo: ${modelVersion}`);
-        console.log(`🔗 Endpoint: ${endpoint}`);
-
-        // Criar prompt de inpainting que preserva a identidade
-        const inpaintingPrompt = `${finalInpaintingPrompt}. A pessoa deve aparecer EXATAMENTE como na imagem de referência, mantendo todas as características faciais idênticas.`;
 
         const requestBody = {
           instances: [
@@ -212,8 +325,8 @@ export async function POST(request: Request) {
           ],
           parameters: {
             sampleCount: 1,
-            guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
-            aspectRatio: '1:1', // Manter proporção
+            guidanceScale: 12,
+            aspectRatio: '1:1',
           },
         };
 
@@ -231,88 +344,33 @@ export async function POST(request: Request) {
             const errorText = await imagenResponse.text();
             console.error(`❌ Modelo ${modelVersion} falhou (${imagenResponse.status}):`, errorText);
             
-            // Se for 403 ou 404, tentar próxima versão
             if (imagenResponse.status === 403 || imagenResponse.status === 404) {
               imagenError = new Error(`Modelo ${modelVersion}: ${errorText}`);
-              continue; // Tentar próxima versão
+              continue;
             }
             
-            // Outros erros, parar
-            throw new Error(`Vertex AI Imagen retornou erro ${imagenResponse.status}: ${errorText}`);
+            throw new Error(`Vertex AI retornou erro ${imagenResponse.status}: ${errorText}`);
           }
 
           imagenData = await imagenResponse.json();
           console.log(`✅ Modelo ${modelVersion} funcionou!`);
-          break; // Sucesso, sair do loop
+          break;
           
         } catch (error) {
-          // Se for erro de rede ou outro, tentar próxima versão
           if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
             imagenError = error;
             continue;
           }
-          // Outros erros, propagar
           throw error;
         }
       }
 
       // Se nenhum modelo funcionou
       if (!imagenData) {
-        console.error('❌ Todos os modelos do Imagen falharam');
-        const errorMsg = imagenError?.message || 'Desconhecido';
-        
-        // Mensagem mais detalhada se for erro de permissão
-        if (errorMsg.includes('403') || errorMsg.includes('PERMISSION_DENIED')) {
-          throw new Error(`Erro de permissão: A Service Account não tem acesso ao Vertex AI Imagen. 
-          
-Solução:
-1. Acesse: https://console.cloud.google.com/iam-admin/iam?project=${projectId}
-2. Encontre sua Service Account e adicione estas roles:
-   - Vertex AI User (roles/aiplatform.user)
-   - Service Account User (roles/iam.serviceAccountUser)
-3. Aguarde 2-3 minutos e tente novamente.
-
-Também verifique se a Vertex AI API está habilitada:
-https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=${projectId}`);
-        }
-        
-        throw new Error(`Nenhum modelo do Vertex AI Imagen está disponível. Último erro: ${errorMsg}. Verifique se a API Vertex AI está habilitada e se a Service Account tem permissões.`);
+        throw new Error(`Nenhum modelo do Vertex AI Imagen está disponível. Último erro: ${imagenError?.message || 'Desconhecido'}. Configure VERTEX_AI_API_KEY ou verifique as permissões da Service Account.`);
       }
 
-      console.log('📦 Resposta recebida do Vertex AI Imagen');
-      
-      // Extrair a imagem gerada
-      const predictions = imagenData.predictions || [];
-      if (predictions.length === 0) {
-        throw new Error('A resposta do Imagen não contém predictions');
-      }
-
-      // A estrutura pode variar, tentar diferentes formatos
-      let imageBase64: string | undefined;
-      
-      if (predictions[0].bytesBase64Encoded) {
-        imageBase64 = predictions[0].bytesBase64Encoded;
-      } else if (predictions[0].imageBytes) {
-        imageBase64 = predictions[0].imageBytes;
-      } else if (predictions[0].generatedImage) {
-        imageBase64 = predictions[0].generatedImage.bytesBase64Encoded || predictions[0].generatedImage.imageBytes;
-      }
-
-      if (!imageBase64) {
-        console.error('Estrutura da resposta:', JSON.stringify(predictions[0], null, 2));
-        throw new Error('A resposta do Imagen não contém uma imagem gerada no formato esperado');
-      }
-
-      const imageBytes = Buffer.from(imageBase64, 'base64');
-      console.log('✅ Inpainting concluído com sucesso!');
-
-      // Retorna a imagem PNG pura, conforme Seção 6.2 do PRD
-      return new NextResponse(imageBytes, {
-        status: 200,
-        headers: {
-          'Content-Type': 'image/png',
-        },
-      });
+      return await processImagenResponse(imagenData);
 
     } catch (error) {
       console.error('❌ Erro no inpainting:', error);
