@@ -161,10 +161,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Preparar as imagens em base64
+    // Preparar as imagens em base64 (friendImageBase64 já foi criado na Etapa 1)
     const baseImageBase64 = await fileToBase64(baseImageFile);
     const maskImageBase64 = await fileToBase64(maskImageFile);
-    const friendImageBase64 = await fileToBase64(friendImageFile);
 
     try {
       // Obter token de autenticação usando Service Account
