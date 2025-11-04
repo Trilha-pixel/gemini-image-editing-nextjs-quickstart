@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { GoogleAuth } from 'google-auth-library';
 
 // --- Configuração dos Clientes de IA ---
 // NOTA: Isso requer variáveis de ambiente em .env.local:
@@ -19,6 +20,38 @@ async function fileToBase64(file: File): Promise<{ data: string; mimeType: strin
     data: base64EncodedData,
     mimeType: file.type,
   };
+}
+
+// --- Helper para obter token de acesso do Google Cloud ---
+async function getAccessToken(): Promise<string> {
+  let auth: GoogleAuth;
+  
+  // Se temos credenciais JSON (Service Account da Vercel), usar elas
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      auth = new GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
+    } catch (error) {
+      throw new Error(`Erro ao parsear GOOGLE_APPLICATION_CREDENTIALS_JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else {
+    // Tentar usar Application Default Credentials (para desenvolvimento local)
+    auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  }
+
+  const client = await auth.getClient();
+  const accessToken = await client.getAccessToken();
+  
+  if (!accessToken.token) {
+    throw new Error('Não foi possível obter token de acesso. Verifique se GOOGLE_APPLICATION_CREDENTIALS_JSON está configurado corretamente na Vercel.');
+  }
+  
+  return accessToken.token;
 }
 
 
@@ -112,118 +145,124 @@ export async function POST(request: Request) {
     console.log('Etapa 1 Concluída. Prompt Gerado:', finalInpaintingPrompt);
 
 
-    // --- ETAPA DE IA 2: Inpainting Real (Gemini 2.0 Flash com Edição) ---
-    // (Usar Gemini 2.0 Flash para fazer edição real na imagem base usando a máscara)
-    // Isso preserva a identidade do amigo e a imagem base do político
+    // --- ETAPA DE IA 2: Inpainting Real (Vertex AI Imagen via REST API) ---
+    // (Usar Vertex AI Imagen para fazer inpainting real com máscara, preservando identidade)
 
-    console.log('Iniciando Etapa 2: Inpainting Real (Gemini 2.0 Flash)');
+    console.log('Iniciando Etapa 2: Inpainting Real (Vertex AI Imagen)');
     
+    // Verificar se temos as credenciais necessárias
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+    
+    if (!projectId) {
+      return NextResponse.json(
+        { error: 'GOOGLE_CLOUD_PROJECT não configurado. Configure nas variáveis de ambiente da Vercel.' },
+        { status: 500 },
+      );
+    }
+
     // Preparar as imagens em base64
     const baseImageBase64 = await fileToBase64(baseImageFile);
     const maskImageBase64 = await fileToBase64(maskImageFile);
     const friendImageBase64 = await fileToBase64(friendImageFile);
 
-    // Criar prompt de inpainting muito específico para preservar a identidade
-    const inpaintingPrompt = `Esta é uma imagem base (primeira imagem) e uma máscara (segunda imagem) que indica onde editar. 
-    
-Na área branca da máscara, você DEVE colocar a pessoa da imagem de referência (terceira imagem), mantendo EXATAMENTE o mesmo rosto, características faciais, cabelo, cor de pele e expressão.
-    
-A pessoa da referência deve aparecer IDÊNTICA na área branca da máscara, preservando 100% de sua identidade. Use apenas o rosto e características da pessoa de referência, mantendo o cenário e o político da imagem base intactos.`;
+    try {
+      // Obter token de autenticação usando Service Account
+      console.log('🔑 Obtendo token de autenticação...');
+      const accessToken = await getAccessToken();
+      console.log('✅ Token obtido com sucesso');
 
-    // Tentar usar Gemini 2.0 Flash para fazer edição/inpainting
-    const imageModelsToTry = [
-      'gemini-2.0-flash-exp-image-generation',
-      'gemini-2.0-flash-exp',
-    ];
+      // Endpoint da API REST do Vertex AI Imagen
+      // NOTA: O modelo imagegeneration@006 é a versão mais recente do Imagen 3
+      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`;
+      
+      console.log(`📡 Chamando Vertex AI Imagen: ${endpoint}`);
 
-    let generatedImage: string | null = null;
-    let imageError: Error | null = null;
+      // Criar prompt de inpainting que preserva a identidade
+      const inpaintingPrompt = `${finalInpaintingPrompt}. A pessoa deve aparecer EXATAMENTE como na imagem de referência, mantendo todas as características faciais idênticas.`;
 
-    for (const modelName of imageModelsToTry) {
-      try {
-        console.log(`🔄 Tentando inpainting com modelo: ${modelName}`);
-        
-        // Enviar as 3 imagens: base, máscara e referência
-        const imageResponse = await genAI.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: inpaintingPrompt },
-                {
-                  inlineData: {
-                    data: baseImageBase64.data,
-                    mimeType: baseImageBase64.mimeType,
-                  },
-                },
-                {
-                  inlineData: {
-                    data: maskImageBase64.data,
-                    mimeType: maskImageBase64.mimeType,
-                  },
-                },
-                {
-                  inlineData: {
-                    data: friendImageBase64.data,
-                    mimeType: friendImageBase64.mimeType,
-                  },
-                },
-              ],
+      const requestBody = {
+        instances: [
+          {
+            prompt: inpaintingPrompt,
+            image: {
+              bytesBase64Encoded: baseImageBase64.data,
             },
-          ],
-          config: {
-            temperature: 0.3, // Temperatura mais baixa para maior precisão
-            topP: 0.95,
-            topK: 40,
-            responseModalities: ['Text', 'Image'],
+            mask: {
+              image: {
+                bytesBase64Encoded: maskImageBase64.data,
+              },
+            },
+            referenceImage: {
+              bytesBase64Encoded: friendImageBase64.data,
+            },
           },
-        });
+        ],
+        parameters: {
+          sampleCount: 1,
+          guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
+          aspectRatio: '1:1', // Manter proporção
+        },
+      };
 
-        // Extrair a imagem da resposta
-        const candidates = imageResponse.candidates || [];
-        if (candidates.length > 0) {
-          const parts = candidates[0].content?.parts || [];
-          for (const part of parts) {
-            if ('inlineData' in part && part.inlineData) {
-              generatedImage = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-              break;
-            }
-          }
-        }
+      const imagenResponse = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-        if (generatedImage) {
-          console.log(`✅ Inpainting concluído com sucesso usando ${modelName}!`);
-          break;
-        }
-      } catch (error) {
-        imageError = error instanceof Error ? error : new Error(String(error));
-        console.log(`❌ Modelo ${modelName} falhou: ${imageError.message}`);
-        continue;
+      if (!imagenResponse.ok) {
+        const errorText = await imagenResponse.text();
+        console.error('❌ Erro na API do Vertex AI Imagen:', errorText);
+        throw new Error(`Vertex AI Imagen retornou erro ${imagenResponse.status}: ${errorText}`);
       }
-    }
 
-    if (!generatedImage) {
+      const imagenData = await imagenResponse.json();
+      console.log('📦 Resposta recebida do Vertex AI Imagen');
+      
+      // Extrair a imagem gerada
+      const predictions = imagenData.predictions || [];
+      if (predictions.length === 0) {
+        throw new Error('A resposta do Imagen não contém predictions');
+      }
+
+      // A estrutura pode variar, tentar diferentes formatos
+      let imageBase64: string | undefined;
+      
+      if (predictions[0].bytesBase64Encoded) {
+        imageBase64 = predictions[0].bytesBase64Encoded;
+      } else if (predictions[0].imageBytes) {
+        imageBase64 = predictions[0].imageBytes;
+      } else if (predictions[0].generatedImage) {
+        imageBase64 = predictions[0].generatedImage.bytesBase64Encoded || predictions[0].generatedImage.imageBytes;
+      }
+
+      if (!imageBase64) {
+        console.error('Estrutura da resposta:', JSON.stringify(predictions[0], null, 2));
+        throw new Error('A resposta do Imagen não contém uma imagem gerada no formato esperado');
+      }
+
+      const imageBytes = Buffer.from(imageBase64, 'base64');
+      console.log('✅ Inpainting concluído com sucesso!');
+
+      // Retorna a imagem PNG pura, conforme Seção 6.2 do PRD
+      return new NextResponse(imageBytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+        },
+      });
+
+    } catch (error) {
+      console.error('❌ Erro no inpainting:', error);
       return NextResponse.json(
-        { error: `Não foi possível fazer inpainting. Erro: ${imageError?.message || 'Nenhum modelo disponível'}` },
+        { error: `Erro no inpainting: ${error instanceof Error ? error.message : String(error)}` },
         { status: 500 },
       );
     }
-
-    // --- Resposta (Sucesso - Contrato 6.2) ---
-    console.log('Etapa 2 Concluída. Enviando imagem gerada.');
-
-    // Converter data URL para buffer
-    const base64Data = generatedImage.split(',')[1];
-    const imageBytes = Buffer.from(base64Data, 'base64');
-    
-    // Retorna a imagem PNG pura, conforme Seção 6.2 do PRD
-    return new NextResponse(imageBytes, {
-      status: 200,
-      headers: {
-        'Content-Type': 'image/png',
-      },
-    });
 
   } catch (error) {
     console.error('Erro grave na API /api/generate:', error);
