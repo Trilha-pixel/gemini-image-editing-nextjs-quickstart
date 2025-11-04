@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
-import {
-  VertexAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} from '@google-cloud/aiplatform'; // SDK da Vertex AI (para Inpainting/Imagen)
+import { VertexAI } from '@google-cloud/aiplatform'; // SDK da Vertex AI (para Inpainting/Imagen)
 import {
   GoogleGenerativeAI, // SDK do Gemini (para Análise de Visão)
   Part,
@@ -99,17 +95,12 @@ export async function POST(request: Request) {
         count: 1,
         guidanceScale: 12, // Força a IA a seguir o prompt com mais rigor
       },
-      safetyConfig: {
-        // Ajuste os níveis de segurança conforme necessário
-        [HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT]: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-        [HarmCategory.HARM_CATEGORY_HATE_SPEECH]: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-      },
     };
 
-    // @ts-ignore (O SDK do @google-cloud/aiplatform pode ter tipos complexos)
+    // @ts-expect-error - O SDK do @google-cloud/aiplatform pode ter tipos complexos
     const inpaintingResponse = await imagenModel.editImage(inpaintingRequest);
 
-    // @ts-ignore
+    // @ts-expect-error - A resposta pode ter estrutura dinâmica
     const imageBase64 = inpaintingResponse[0].imageBytes;
     if (!imageBase64) {
       return NextResponse.json(
@@ -134,8 +125,7 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Erro grave na API /api/generate:', error);
-    // @ts-ignore
-    const errorMessage = error.message || 'Erro interno do servidor.';
+    const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor.';
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 },
