@@ -30,7 +30,7 @@ if (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_LOCATION) {
 // 2. Cliente Gemini (para Análise de Visão)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const visionModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-pro-latest', // Ou 'gemini-pro-vision'
+  model: 'gemini-1.5-flash', // Modelo com suporte a visão
 });
 
 // --- Helper para converter Arquivo (File) para a API do Google ---
