@@ -41,7 +41,7 @@ export default function RootLayout({
           backgroundImage: "url('/logo/gabinete.png')",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          backgroundAttachment: "fixed",
+          backgroundRepeat: "no-repeat",
         }}
         suppressHydrationWarning
       >
