@@ -5,7 +5,7 @@ import { ImageResultDisplay } from "@/components/ImageResultDisplay";
 import { Button } from "@/components/ui/button";
 import { ImageIcon, Wand2 } from "lucide-react";
 import { HistoryItem } from "@/lib/types";
-import { buildComposePrompt, type PoliticalFigure, type FriendGender, SCENARIO_OPTIONS } from "@/lib/utils";
+import { type PoliticalFigure, SCENARIO_OPTIONS } from "@/lib/utils";
 
 const loadingTexts = [
   "Imprimindo a faixa presidencial...",
@@ -51,23 +51,23 @@ export default function Home() {
   const displayImage = resultImage || generatedImage;
 
   const handleGenerateLLM = async (politicalFigure: PoliticalFigure) => {
-    if (!image) return;
+    if (!image || !friendGender || !sceneKey) return;
     try {
       setLoadingText(loadingTexts[Math.floor(Math.random() * loadingTexts.length)]);
       setIsLoading(true);
       setError(null);
       setResultImage(null);
 
-      const sceneDescription = SCENARIO_OPTIONS.find((s) => s.key === sceneKey || "")?.description;
-      const prompt = buildComposePrompt(
-        politicalFigure,
-        friendGender as FriendGender | undefined,
-        sceneDescription
-      );
+      const sceneDescription = SCENARIO_OPTIONS.find((s) => s.key === sceneKey)?.description || "";
       const response = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, image })
+        body: JSON.stringify({
+          politicalFigure,
+          genero: friendGender,
+          cenario: sceneDescription,
+          image
+        })
       });
 
       if (!response.ok) {
